@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONException;
@@ -84,6 +85,8 @@ public class MainActivity extends ActionBarActivity {
         private ImageView mImageView;
         private Button buttonTake;
         private Button buttonUpload;
+        private TextView titleText;
+        private TextView descriptionText;
 
         public PlaceholderFragment() {
         }
@@ -255,6 +258,8 @@ public class MainActivity extends ActionBarActivity {
                     buttonTake.setVisibility(View.VISIBLE);
                     buttonUpload.setVisibility(View.GONE);
                     mImageView.setImageDrawable(null);
+                    titleText.setText("");
+                    descriptionText.setText("");
                     createNotification(content, "Image Uploaded");
                 }
             }
