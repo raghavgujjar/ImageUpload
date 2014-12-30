@@ -114,6 +114,11 @@ public class MainActivity extends ActionBarActivity {
                         BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
                         Bitmap imageBitmap = drawable.getBitmap();
                         Log.d("After reading","width="+imageBitmap.getWidth()+" height="+imageBitmap.getHeight());
+                        buttonTake.setVisibility(View.VISIBLE);
+                        buttonUpload.setVisibility(View.GONE);
+                        mImageView.setImageDrawable(null);
+                        titleText.setText("");
+                        descriptionText.setText("");
                         new UploadImageTask(getActivity()).execute(imageBitmap);
                     }
                     else {
@@ -257,11 +262,6 @@ public class MainActivity extends ActionBarActivity {
                     createNotification(content, "Upload Failed");
                 }
                 else {
-                    buttonTake.setVisibility(View.VISIBLE);
-                    buttonUpload.setVisibility(View.GONE);
-                    mImageView.setImageDrawable(null);
-                    titleText.setText("");
-                    descriptionText.setText("");
                     createNotification(content, "Image Uploaded");
                 }
             }
