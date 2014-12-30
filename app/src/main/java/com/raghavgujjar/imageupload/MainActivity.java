@@ -1,12 +1,14 @@
 package com.raghavgujjar.imageupload;
 
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -279,10 +281,29 @@ public class MainActivity extends ActionBarActivity {
             }
 
             private void createNotification(String title, String text) {
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
-                        .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-                        .setContentTitle(title)
-                        .setContentText(text);
+                NotificationCompat.Builder builder;
+                Uri webPage = Uri.parse("http://imageupload-env.elasticbeanstalk.com/uploadedImage/uploadedImage.png");
+                Intent resultIntent = new Intent(Intent.ACTION_VIEW, webPage);
+                PendingIntent resultPendingIntent = PendingIntent.getActivity(context, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+                if (title.equals("Success")) {
+                    builder = new NotificationCompat.Builder(context)
+                            .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                            .setContentTitle(title)
+                            .setContentText(text)
+                            .setAutoCancel(true)
+                            .setTicker("The photo was uploaded successfully")
+                            .setContentIntent(resultPendingIntent);
+                }
+
+                else {
+                    builder = new NotificationCompat.Builder(context)
+                            .setSmallIcon(android.R.drawable.stat_notify_error)
+                            .setContentTitle(title)
+                            .setContentText(text)
+                            .setAutoCancel(true)
+                            .setTicker("The photo failed to upload");
+                }
 
                 notificationManager =
                         (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
