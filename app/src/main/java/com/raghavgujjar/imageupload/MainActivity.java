@@ -281,24 +281,25 @@ public class MainActivity extends ActionBarActivity {
             }
 
             private void createNotification(String title, String text) {
-                NotificationCompat.Builder builder;
-                Uri webPage = Uri.parse("http://imageupload-env.elasticbeanstalk.com/uploadedImage/uploadedImage.png");
-                Intent resultIntent = new Intent(Intent.ACTION_VIEW, webPage);
-                PendingIntent resultPendingIntent = PendingIntent.getActivity(context, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+                        .setSmallIcon(android.R.drawable.stat_sys_upload)
+                        .setContentTitle(title)
+                        .setContentText(text)
+                        .setAutoCancel(true);
 
                 if (title.equals("Success")) {
-                    builder = new NotificationCompat.Builder(context)
-                            .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                    Uri webPage = Uri.parse("http://imageupload-env.elasticbeanstalk.com/uploadedImage/uploadedImage.png");
+                    Intent resultIntent = new Intent(Intent.ACTION_VIEW, webPage);
+                    PendingIntent resultPendingIntent = PendingIntent.getActivity(context, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                    builder.setSmallIcon(android.R.drawable.stat_sys_upload_done)
                             .setContentTitle(title)
                             .setContentText(text)
                             .setAutoCancel(true)
                             .setTicker("The photo was uploaded successfully")
                             .setContentIntent(resultPendingIntent);
                 }
-
-                else {
-                    builder = new NotificationCompat.Builder(context)
-                            .setSmallIcon(android.R.drawable.stat_notify_error)
+                if (title.equals("Failed") || title.equals("Error")) {
+                    builder.setSmallIcon(android.R.drawable.stat_notify_error)
                             .setContentTitle(title)
                             .setContentText(text)
                             .setAutoCancel(true)
