@@ -1,20 +1,26 @@
 package com.raghavgujjar.imageupload;
 
+import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
+import android.media.ExifInterface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.v4.app.Fragment;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
+import android.support.v7.app.ActionBar;
+import android.support.v4.app.Fragment;
+import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -23,23 +29,34 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.os.Build;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.Scanner;
 
 
@@ -84,11 +101,15 @@ public class MainActivity extends ActionBarActivity {
      */
     public static class PlaceholderFragment extends Fragment {
         private static final int REQUEST_IMAGE_CAPTURE = 1;
+        public static final String IMAGE_DIRECTORY_NAME = "Image Upload";
+        private String mCurrentPhotoPath;
         private ImageView mImageView;
         private Button buttonTake;
         private Button buttonUpload;
+        private Button buttonCancel;
         private TextView titleText;
         private TextView descriptionText;
+        private Bitmap bitmap;
 
         public PlaceholderFragment() {
         }
@@ -100,6 +121,18 @@ public class MainActivity extends ActionBarActivity {
             mImageView = (ImageView) rootView.findViewById(R.id.imageView);
             buttonTake = (Button)rootView.findViewById(R.id.button_take);
             buttonUpload = (Button)rootView.findViewById(R.id.button_upload);
+            buttonCancel = (Button)rootView.findViewById(R.id.button_cancel);
+            titleText = (TextView) rootView.findViewById(R.id.title_text);
+            descriptionText = (TextView) rootView.findViewById(R.id.description_text);
+
+            if (savedInstanceState !=null && savedInstanceState.getString("path") !=null) {
+                mCurrentPhotoPath = savedInstanceState.getString("path");
+                buttonTake.setVisibility(View.GONE);
+                buttonUpload.setVisibility(View.VISIBLE);
+                buttonCancel.setVisibility(View.VISIBLE);
+                setPic();
+            }
+
             buttonTake.setOnClickListener(new View.OnClickListener(){
                 public void onClick(View v) {
                     dispatchTakePictureIntent();
@@ -111,44 +144,149 @@ public class MainActivity extends ActionBarActivity {
                             getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
                     NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
                     if (networkInfo != null && networkInfo.isConnected()) {
-                        BitmapDrawable drawable = (BitmapDrawable) mImageView.getDrawable();
-                        Bitmap imageBitmap = drawable.getBitmap();
-                        Log.d("After reading","width="+imageBitmap.getWidth()+" height="+imageBitmap.getHeight());
-                        buttonTake.setVisibility(View.VISIBLE);
-                        buttonUpload.setVisibility(View.GONE);
-                        mImageView.setImageDrawable(null);
-                        titleText.setText("");
-                        descriptionText.setText("");
-                        new UploadImageTask(getActivity()).execute(imageBitmap);
+                        cancelForm();
+                        new UploadImageTask(getActivity()).execute(bitmap);
                     }
                     else {
                         Toast.makeText(getActivity(), "No Internet Connection", Toast.LENGTH_SHORT).show();
                     }
                 }
             });
+
+            buttonCancel.setOnClickListener(new View.OnClickListener(){
+                public void onClick(View v) {
+                    cancelForm();
+                    mCurrentPhotoPath = null;
+                    bitmap = null;
+                }
+            });
             return rootView;
+        }
+
+        @Override
+        public void onSaveInstanceState(Bundle outState) {
+            super.onSaveInstanceState(outState);
+            outState.putString("path", mCurrentPhotoPath);
+        }
+
+        private void cancelForm() {
+            buttonTake.setVisibility(View.VISIBLE);
+            buttonUpload.setVisibility(View.GONE);
+            buttonCancel.setVisibility(View.GONE);
+            mImageView.setImageDrawable(null);
+            titleText.setText("");
+            descriptionText.setText("");
+        }
+
+        private File createImageFile() throws IOException {
+            File storageDir = new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_PICTURES),IMAGE_DIRECTORY_NAME);
+
+            if (!storageDir.exists()) {
+                if (!storageDir.mkdirs()) {
+                    Log.d("FAILED_IMAGE_DIRECTORY", "Failed to create "
+                            + IMAGE_DIRECTORY_NAME + " directory");
+                    return null;
+                }
+            }
+            // Create an image file name
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            File image = new File(storageDir.getPath()+ File.separator + "IMG_" + timeStamp + ".png");
+            return image;
         }
 
         private void dispatchTakePictureIntent() {
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+                File photoFile = null;
+                try {
+                    photoFile = createImageFile();
+                    mCurrentPhotoPath = photoFile.getAbsolutePath();
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(photoFile));
+
+                } catch (IOException ioe) {
+                    photoFile = null;
+                    mCurrentPhotoPath = null;
+                    Log.e("IMAGE_FILE_FAILED", ioe.getMessage());
+                }
                 startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
             }
+            else {
+                Toast.makeText(getActivity(), "No camera available", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private void setPic() {
+            // Get the dimensions of the View
+            int targetW = mImageView.getWidth();
+            int targetH = mImageView.getHeight();
+
+            // Get the dimensions of the bitmap
+            BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+            bmOptions.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+            int photoW = bmOptions.outWidth;
+            int photoH = bmOptions.outHeight;
+
+            // Determine how much to scale down the image
+            int scaleFactor = 1;
+            if ((targetW > 0) || (targetH > 0)) {
+                scaleFactor = Math.min(photoW/targetW, photoH/targetH);
+            }
+
+            // Decode the image file into a Bitmap sized to fill the View
+            bmOptions.inJustDecodeBounds = false;
+            bmOptions.inSampleSize = scaleFactor;
+            bmOptions.inPurgeable = true;
+
+            try {
+                bitmap = reOrient(mCurrentPhotoPath, bmOptions);
+                mImageView.setImageBitmap(bitmap);
+            } catch(IOException ioe) {
+                Log.d("ERROR IN ORIENTING",ioe.getMessage());
+            }
+        }
+
+        private Bitmap reOrient(String path, BitmapFactory.Options options) throws IOException {
+            ExifInterface exif = new ExifInterface(path);
+            int exifOrientation = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL);
+
+            int rotate = 0;
+
+            switch (exifOrientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    rotate = 90;
+                    break;
+
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    rotate = 180;
+                    break;
+
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    rotate = 270;
+                    break;
+            }
+
+            Matrix matrix = new Matrix();
+            matrix.preRotate(rotate);
+            Bitmap bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath, options);
+            bitmap = Bitmap.createBitmap(bitmap, 0, 0,bitmap.getWidth(), bitmap.getHeight(), matrix, false);
+            return bitmap;
         }
 
         @Override
         public void onActivityResult(int requestCode, int resultCode, Intent data) {
             if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-                Bundle extras = data.getExtras();
-                Bitmap imageBitmap = (Bitmap) extras.get("data");
-                Log.d("After taking","width="+imageBitmap.getWidth()+" height="+imageBitmap.getHeight());
                 buttonTake.setVisibility(View.GONE);
                 buttonUpload.setVisibility(View.VISIBLE);
-                mImageView.setImageBitmap(imageBitmap);
+                buttonCancel.setVisibility(View.VISIBLE);
+                setPic();
             }
         }
 
-        private class UploadImageTask extends AsyncTask<Bitmap, Void, String> {
+        public class UploadImageTask extends AsyncTask<Bitmap, Void, String> {
             private boolean error = false;
             private Context context;
             private int NOTIFICATION_ID = 1;
@@ -161,22 +299,19 @@ public class MainActivity extends ActionBarActivity {
                 notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             }
 
+            protected void onPreExecute() {
+                createNotification("Progress","Photo upload in progress");
+            }
+
             @Override
             protected String doInBackground(Bitmap... imageBitmap) {
                 InputStream is = null;
                 HttpURLConnection conn = null;
+                byte[] pictureBytes;
                 try {
-                    //Construct Image Data
-                    Bitmap bitmapImage = imageBitmap[0];
-                    ByteArrayOutputStream bao = new ByteArrayOutputStream();
-                    double width = bitmapImage.getWidth();
-                    double height = bitmapImage.getHeight();
-                    double ratio = 400/width;
-                    int newHeight = (int)(ratio*height);
-                    bitmapImage = Bitmap.createScaledBitmap(bitmapImage, 400, newHeight, true);
-                    Log.d("New height and width: ","width="+bitmapImage.getWidth()+" height="+bitmapImage.getHeight());
-                    bitmapImage.compress(Bitmap.CompressFormat.PNG, 95, bao);
-                    byte[] ba = bao.toByteArray();
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    imageBitmap[0].compress(Bitmap.CompressFormat.PNG, 95, bos);
+                    byte[] ba = bos.toByteArray();
                     String imageData = Base64.encodeToString(ba, Base64.DEFAULT);
 
                     //Create URL and param
@@ -258,6 +393,8 @@ public class MainActivity extends ActionBarActivity {
             }
 
             protected void onPostExecute(String content) {
+                bitmap = null;
+                mCurrentPhotoPath = null;
                 if (error) {
                     createNotification(content, "Upload Failed");
                 }
